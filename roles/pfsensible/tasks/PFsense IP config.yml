@@ -1,0 +1,40 @@
+---
+- name: Configure NIC settings
+  hosts: all
+  gather_facts: no
+  become: true
+
+  vars_files:
+    - variables.yml
+
+  vars_prompt:
+    - name: "blade_num"
+      prompt: "blade nummer"
+      private: no
+    - name: "OTAP_status"
+      prompt: O=1, T=2, A=3, P=4
+      private: no
+  
+  tasks:
+    - name: Add ipv4_gateway
+      pfsense_gateway:
+        name: WANGW
+        descr: "Gateway voor wan"
+        interface: EM1
+        gateway: "172.16.{{ blade_num }}.1"
+        ipprotocol: IPv4
+
+    - name: add interface 1 as WAN
+      pfsense_interface:
+        descr: le0
+        interface: le0
+        ipv4_address: "null" 
+        ipv4_gateway: "WANGW"
+        enabled: True
+    - name: add interface 2 as LAN
+      pfsense_interface:
+        descr: le1
+        interface: le1 
+        ipv4_address: "null"
+        enabled: True
+

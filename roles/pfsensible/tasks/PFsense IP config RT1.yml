@@ -1,0 +1,155 @@
+---
+- name: Configure NIC settings
+  hosts: localhost
+  gather_facts: no
+  become: true
+
+  vars:
+    pfsense_user: "admin"
+    pfsense_pw: "pfsense"
+    ansible_connection: "local"
+
+  vars_prompt:
+    - name: "blade_num"
+      prompt: "blade nummer"
+      private: no
+    - name: "OTAP_letter"
+      prompt: O, T, A, P
+      private: no
+      ansible_python_interpreter: /usr/bin/python3.10
+
+  tasks:
+    - name: Set OTAP status fact
+      set_fact:
+        OTAP_status: "{{ {'O': 1, 'T': 2, 'A': 3, 'P': 4}[OTAP_letter] }}"
+
+    - name: install 
+      package:
+        name:
+          - pfSense-pkg-sudo
+        state: present
+
+    - name: Read inventory.json file
+      ansible.builtin.set_fact:
+        inventory_data: "{{ lookup('file', 'inventory.json') | from_json }}"
+
+    - name: Set NIC name based on blade number
+      set_fact:
+        nic_prefix: >
+          {% if blade_num == '7' %}
+          EM
+          {% elif blade_num == '10' %}
+          EL
+          {% else %}
+          Unknown
+          {% endif %}
+    
+    - name: Set variable IPv4address
+      set_fact:
+        ipv4_prefix: "Your IPv4 address logic here" 
+    - name: set RTnaam
+      set_fact:
+        hostnameRT1: RT-1-Blade-{{OTAP_letter}}{{blade_num}}
+
+    - name: Add ipv4_gateway
+      pfsensible.core.pfsense_gateway:
+        name: WANGW
+        descr: "Gateway voor wan"
+        interface: "{{nic_prefix}}0"
+        gateway: "172.16.10{{blade_num}}.5"
+        ipprotocol: IPv4
+        state: present
+
+    - name: Add DMZ gateway
+      pfsensible.core.pfsense_gateway:
+        name: DMZGW
+        descr: "Gateway voor DMZ"
+        interface: "{{nic_prefix}}0"
+        gateway: "10.{{OTAP_status}.{{blade_num}}.2"
+        ipprotocol: IPv4
+        state: present
+
+    - name: add interface 1 as WAN
+      pfsensible.core.pfsense_interface:
+        descr: "{{nic_prefix}}0"
+        interface: "{{nic_prefix}}0"
+        ipv4_type: static
+        ipv4_address: "{{WAN_IP}}" #moet nog uit de inventory file worden gehaald.
+        ipv4_prefixlen: 24
+        ipv4_gateway: "WANGW"
+        enabled: True
+
+    - name: add interface 2 as LAN
+      pfsensible.core.pfsense_interface:
+        descr: "{{nic_prefix}}1"
+        interface: "{{nic_prefix}}1"
+        ipv4_address: "{{LAN_IP}}1"
+        ipv4_prefixlen: 24
+        enabled: True
+
+    - name: Add static route
+      pfsensible.core.pfsense_route:
+        descr: DMZ static route
+        gateway: "DMZGW"
+        network: "10.{{OTAP_status}}{{OTAP_status}}.{{blade_num}}.0/24"
+        state: present
+    
+    - name: firewall rule SSH
+      pfsensible.core.pfsense_rule:
+        name: SSH any any
+        action: pass
+        interface: WAN
+        ipprotocol: inet 
+        protocol: any
+        source: any
+        source_port: any
+        destination: any
+        destination_port: 2222
+
+    - name: firewall rule OpenVPN
+      pfsensible.core.pfsense_rule:
+        name: OpenVPN any any
+        action: pass
+        interface: WAN
+        ipprotocol: inet 
+        protocol: any
+        source: any
+        source_port: any
+        destination: any
+        destination_port: 2000
+
+    - name: firewall rule HTTPS
+      pfsensible.core.pfsense_rule:
+        name: HTTPS any any
+        action: pass
+        interface: WAN
+        ipprotocol: inet 
+        protocol: any
+        source: any
+        source_port: any
+        destination: any
+        destination_port: 443
+
+    - name: firewall rule API
+      pfsensible.core.pfsense_rule:
+        name: API any any
+        action: pass
+        interface: WAN
+        ipprotocol: inet 
+        protocol: any
+        source: any
+        source_port: any
+        destination: any
+        destination_port: 8080
+
+- name: Read and use JSON data from inventory file
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Read inventory.json file
+      ansible.builtin.set_fact:
+        inventory_data: "{{ lookup('file', 'inventory.json') | from_json }}"
+
+    - name: Display the parsed inventory data
+      ansible.builtin.debug:
+        var: inventory_data

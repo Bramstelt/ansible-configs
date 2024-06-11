@@ -1,0 +1,47 @@
+---
+- name: Configure NIC settings
+  hosts: localhost
+  gather_facts: no
+  become: true
+
+  vars_files:
+    - vars/variables.yml
+
+  vars_prompt:
+    - name: "blade_num"
+      prompt: "blade nummer"
+      private: no
+    - name: "OTAP_status"
+      prompt: O=1, T=2, A=3, P=4
+      private: no
+  
+  tasks:
+    - name: Set NIC name based on blade number
+      set_fact:
+        nic_prefix: >
+          {% if blade_num == '7' %}
+          EM
+          {% elif blade_num == '10' %}
+          EL
+          {% else %}
+          Unknown
+          {% endif %}
+    
+    - name: Set variable IPv4address
+      set_fact:
+        ipv4_prefix: "Your IPv4 address logic here" 
+
+    - name: add interface 1 as WAN
+      pfsense_interface:
+        descr: "WAN"
+        interface: "{{ nic_prefix }}0"
+        ipv4_address: "10.{{ OTAP_status }}.{{ blade_num }}.2"
+        ipv4_gateway: "WANGW"
+        enabled: True
+
+    - name: add interface 2 as LAN
+      pfsense_interface:
+        descr: "LAN"
+        interface: "{{ nic_prefix }}1"
+        ipv4_address: "10.{{ OTAP_status }}.{{ blade_num }}.1"
+        enabled: True

@@ -1,2 +1,22 @@
 ---
-- name: test
+- name: check pfsense
+  hosts: localhost
+  gather_facts: no
+  collections:
+    - pfsensible.pfsense
+
+  vars:
+    pfsense_host: "192.168.1.1"
+    pfsense_user: "admin"
+    pfsense_password: "pfsense"
+    ansible_connection: "local"
+
+  tasks:
+    - name: Ensure the WAN interface is enabled
+      pfsensible.core.pfsense_interface:
+        name: 'wan'
+        enabled: yes
+        pfSense:
+          hostname: "{{ pfsense_host }}"
+          username: "{{ pfsense_user }}"
+          password: "{{ ansible_password }}"
